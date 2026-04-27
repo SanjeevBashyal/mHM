@@ -150,7 +150,7 @@ CONTAINS
     use mo_append, only : append
     use mo_mpr_global_variables, only : L0_gridded_LAI, dirgridded_LAI, nLAI, LAIBoundaries
     use mo_common_constants, only : defaultTolerance_dp
-    use mo_ncread, only : Get_NcDim, Get_NcVar, Get_NcVarAtt
+    use mo_netcdf, only : NcDataset, NcVariable
     use mo_string_utils, only : num2str
     use mo_utils, only : eq
 
@@ -174,14 +174,12 @@ CONTAINS
     ! name of NetCDF file
     character(256) :: fName
 
-    ! netcdf attribute values
-    character(256) :: AttValues
+    type(NcDataset) :: nc
 
-    ! datatype of attribute
-    integer(i4) :: datatype
+    type(NcVariable) :: var
 
     ! dimension for NetCDF file
-    integer(i4), dimension(5) :: dimen
+    integer(i4), dimension(:), allocatable :: dimen
 
     ! data nodata value
     real(dp) :: nodata_value
@@ -189,8 +187,11 @@ CONTAINS
 
     fName = trim(dirgridded_LAI(iDomain)) // trim('lai.nc')
 
+    nc = NcDataset(trim(fName), "r")
+    var = nc%getVariable('lai')
+
     ! get dimensions
-    dimen = Get_NcDim(trim(fName), 'lai')
+    dimen = var%getShape()
     if ((dimen(1) .ne. nRows) .or. (dimen(2) .ne. nCols)) then
        call error_message('***ERROR: read_nc: mHM generated x and y are not matching NetCDF dimensions')
     end if
@@ -199,11 +200,10 @@ CONTAINS
     end if
 
     ! determine no data value
-    call Get_NcVarAtt(trim(fName), 'lai', '_FillValue', AttValues, dtype = datatype)
-    ! convert to number
-    read(AttValues, *) nodata_value
+    call var%getAttribute('_FillValue', nodata_value)
 
-    call Get_NcVar(trim(fName), 'lai', LAI0_3D)
+    call var%getData(LAI0_3D)
+    call nc%close()
 
     ! start checking values
     do t = 1, dimen(3)
